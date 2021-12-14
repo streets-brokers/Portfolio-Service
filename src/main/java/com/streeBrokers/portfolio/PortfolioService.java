@@ -32,7 +32,10 @@ public class PortfolioService {
 
 
     public Portfolio savePortfolio(Portfolio portfolio){
-
+        Optional<Portfolio> foundPortfolio = getPortfolioById(portfolio.getPortfolioId());
+        if(foundPortfolio.isPresent()){
+            throw new IllegalStateException("Portfolio Already Exits");
+        }
         log.info("Inside savePortfolio method in PortfolioService");
         return portfolioRepository.save(portfolio);
     }
