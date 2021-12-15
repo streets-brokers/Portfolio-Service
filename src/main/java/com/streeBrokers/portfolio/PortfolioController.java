@@ -30,7 +30,7 @@ public class PortfolioController {
     }
 
     @GetMapping("portfolioId/{portfolioId}")
-    public Optional<Portfolio> getPortfolioById(@PathVariable("portfolioId") Long portfolioId){
+    public Portfolio getPortfolioById(@PathVariable("portfolioId") Long portfolioId){
         log.info("Inside getPortfolioById method in PortfolioController");
         return portfolioService.getPortfolioById(portfolioId);
     }

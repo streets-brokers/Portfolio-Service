@@ -32,10 +32,14 @@ public class PortfolioService {
 
 
     public Portfolio savePortfolio(Portfolio portfolio){
-        Optional<Portfolio> foundPortfolio = getPortfolioById(portfolio.getPortfolioId());
-        if(foundPortfolio.isPresent()){
+       Portfolio foundPortfolio = getPortfolioById(portfolio.getPortfolioId());
+        if(foundPortfolio != null){
             throw new IllegalStateException("Portfolio Already Exits");
         }
+
+        portfolio.setCurrentTotalValue(new BigDecimal(0));
+        portfolio.setSellValue(new BigDecimal(0));
+        portfolio.setPurchaseValue(new BigDecimal(0));
         log.info("Inside savePortfolio method in PortfolioService");
         return portfolioRepository.save(portfolio);
     }
@@ -126,13 +130,89 @@ public class PortfolioService {
          */
     }
 
-    public Optional<Portfolio> getPortfolioById(Long portfolioId){
+    public Portfolio getPortfolioById(Long portfolioId){
         Optional<Portfolio> portfolioById = portfolioRepository.findByPortfolioId(portfolioId);
         if(portfolioById.isEmpty()){
             throw new IllegalStateException("Portfolio is not found");
         }
+        Portfolio portfolio = portfolioById.get();
+        List<Order> orders = getListOfFulfilledOrders(portfolio.getClientId());
+
+        // grouping happens here right?
+        // orders = orderMSFT_1, orderAAPPL_2, orderMSFT_3, orderIBM_4
+        // orderMap = {"MSFT": [orderMSFT_1, orderMSFT_3], "AAPL": [orderAAPPL_2], "IBM": [orderIBM_4], }
+        // newHolding = {
+        Map<String, LinkedList<Order>> orderMap = new HashMap<>();
+        Map<String, HoldingObj> newHolding = new HashMap<>();
+        for (Order order: orders) {
+            // if order side is BUY then add value else subtract
+            // if side is Buy then we add quantities else we subtract
+            if (orderMap.containsKey(order.getProduct())) {
+                orderMap.get(order.getProduct()).add(order);
+            }else {
+                LinkedList list = new LinkedList();
+                list.add(order);
+                orderMap.put(order.getProduct(), list);
+            }
+
+            if (newHolding.containsKey(order.getProduct())) {
+                HoldingObj holdingObj = newHolding.get(order.getProduct());
+
+                if(order.getSide() == "BUY"){
+                    newHolding.get(order.getProduct()).setQuantity(holdingObj.getQuantity() + order.getQuantity());
+                    newHolding.get(order.getProduct()).setPurchaseValue(holdingObj.getPurchaseValue().add(new BigDecimal(order.getPrice())));
+                    newHolding.get(order.getProduct()).setSellValue(holdingObj.getSellValue().add(new BigDecimal(order.getMarketPrice())));
+                    newHolding.get(order.getProduct()).setCurrentValue(holdingObj.getCurrentValue().add(new BigDecimal(order.getValue())));
+                } else {
+                    newHolding.get(order.getProduct()).setQuantity(holdingObj.getQuantity() - order.getQuantity());
+                    newHolding.get(order.getProduct()).setPurchaseValue(holdingObj.getPurchaseValue().subtract(new BigDecimal(order.getMarketPrice())));
+                    newHolding.get(order.getProduct()).setSellValue(holdingObj.getSellValue().subtract(new BigDecimal(order.getPrice())));
+                    newHolding.get(order.getProduct()).setCurrentValue(holdingObj.getCurrentValue().subtract(new BigDecimal(order.getValue())));
+                }
+            }else {
+                HoldingObj holdingObj = new HoldingObj();
+
+                if(order.getSide() == "BUY"){
+                    holdingObj.setQuantity(order.getQuantity());
+                    holdingObj.setPurchaseValue(holdingObj.getPurchaseValue().add(new BigDecimal(order.getPrice())));
+                    holdingObj.setSellValue(holdingObj.getSellValue().add(new BigDecimal(order.getMarketPrice())));
+                    holdingObj.setCurrentValue(holdingObj.getCurrentValue().add(new BigDecimal(order.getValue())));
+                } else {
+                    holdingObj.setQuantity(0 - order.getQuantity());
+                    holdingObj.setPurchaseValue(new BigDecimal(0).subtract(new BigDecimal(order.getMarketPrice())));
+                    holdingObj.setSellValue(new BigDecimal(0).subtract(new BigDecimal(order.getPrice())));
+                    holdingObj.setCurrentValue(new BigDecimal(0).subtract(new BigDecimal(order.getValue())));
+                }
+                newHolding.put(order.getProduct(), holdingObj);
+            }
+
+        }
+        Portfolio existingPortfolio = portfolio;
+        for(String sym : newHolding.keySet()){
+
+            BigDecimal totalValue = newHolding.get(sym).getCurrentValue();
+            totalValue = totalValue.add(newHolding.get(sym).getCurrentValue());
+            existingPortfolio.setCurrentTotalValue(totalValue);
+
+            BigDecimal totalPurchaseValue = newHolding.get(sym).getPurchaseValue();
+            totalPurchaseValue = totalPurchaseValue.add(newHolding.get(sym).getPurchaseValue());
+            existingPortfolio.setPurchaseValue(totalPurchaseValue);
+
+            BigDecimal totalSellValue = newHolding.get(sym).getSellValue();
+            totalSellValue= totalSellValue.add(newHolding.get(sym).getSellValue());
+            existingPortfolio.setSellValue(totalSellValue);
+        }
+        Portfolio updatedPortfolio = portfolioRepository.save(existingPortfolio);
+        log.info("ORDER MAP {}", orderMap);
+        log.info("HOLDING MAP {}", newHolding);
         log.info("Inside getPortfolioById method inside PortfolioService");
-        return portfolioById;
+        return new Portfolio(updatedPortfolio.getPortfolioId(),updatedPortfolio.getClientId(),updatedPortfolio.getName(),updatedPortfolio.getCurrentTotalValue(),
+                updatedPortfolio.getPurchaseValue(),updatedPortfolio.getSellValue());
+        /**
+         *
+         * I would like you to help me return the newHoldings
+         */
+//        return portfolioById;
     }
 
     public void collectFulfilledOrders(Order order){
@@ -148,7 +228,7 @@ public class PortfolioService {
         List<Order> orderList = orderRepository.viewListOfFulfilledOrders(clientId);
         log.info("Inside getListOfFulfilledOrders method in PortfolioService");
         if(orderList == null){
-            System.out.println("Order is empty"+orderList);
+            throw new IllegalStateException("No Order found");
         }
 
         return orderList;
