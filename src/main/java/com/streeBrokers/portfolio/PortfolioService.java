@@ -11,6 +11,7 @@ import javax.persistence.CascadeType;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
+import javax.sound.sampled.Port;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -32,8 +33,9 @@ public class PortfolioService {
 
 
     public Portfolio savePortfolio(Portfolio portfolio){
-       Portfolio foundPortfolio = getPortfolioById(portfolio.getPortfolioId());
-        if(foundPortfolio != null){
+       PortfolioHolding portfolioHolding = getPortfolioById(portfolio.getPortfolioId());
+        Portfolio portfolio1 = portfolioHolding.getPortfolio();
+        if(portfolio1 != null){
             throw new IllegalStateException("Portfolio Already Exits");
         }
 
@@ -46,7 +48,7 @@ public class PortfolioService {
 
 
 
-    public Portfolio getPortfolioByClientId(Long clientId){
+    public PortfolioHolding getPortfolioByClientId(Long clientId){
         Optional<Portfolio> portfolioByClientId = portfolioRepository.findByClientId(clientId);
         if(portfolioByClientId.isEmpty()){
             throw new IllegalStateException("Client Portfolio not found");
@@ -74,7 +76,7 @@ public class PortfolioService {
             if (newHolding.containsKey(order.getProduct())) {
                 HoldingObj holdingObj = newHolding.get(order.getProduct());
 
-                if(order.getSide() == "BUY"){
+                if(Objects.equals(order.getSide(), "BUY")){
                     newHolding.get(order.getProduct()).setQuantity(holdingObj.getQuantity() + order.getQuantity());
                     newHolding.get(order.getProduct()).setPurchaseValue(holdingObj.getPurchaseValue().add(new BigDecimal(order.getPrice())));
                     newHolding.get(order.getProduct()).setSellValue(holdingObj.getSellValue().add(new BigDecimal(order.getMarketPrice())));
@@ -88,13 +90,13 @@ public class PortfolioService {
             }else {
                 HoldingObj holdingObj = new HoldingObj();
 
-                if(order.getSide() == "BUY"){
+                if(Objects.equals(order.getSide(), "BUY")){
                     holdingObj.setQuantity(order.getQuantity());
                     holdingObj.setPurchaseValue(holdingObj.getPurchaseValue().add(new BigDecimal(order.getPrice())));
                     holdingObj.setSellValue(holdingObj.getSellValue().add(new BigDecimal(order.getMarketPrice())));
                     holdingObj.setCurrentValue(holdingObj.getCurrentValue().add(new BigDecimal(order.getValue())));
                 } else {
-                    holdingObj.setQuantity(0 - order.getQuantity());
+                    holdingObj.setQuantity(-order.getQuantity());
                     holdingObj.setPurchaseValue(new BigDecimal(0).subtract(new BigDecimal(order.getMarketPrice())));
                     holdingObj.setSellValue(new BigDecimal(0).subtract(new BigDecimal(order.getPrice())));
                     holdingObj.setCurrentValue(new BigDecimal(0).subtract(new BigDecimal(order.getValue())));
@@ -122,15 +124,18 @@ public class PortfolioService {
         log.info("ORDER MAP {}", orderMap);
         log.info("HOLDING MAP {}", newHolding);
         log.info("Inside getPortfolioByClientId method inside PortfolioService");
-        return new Portfolio(updatedPortfolio.getPortfolioId(),updatedPortfolio.getClientId(),updatedPortfolio.getName(),updatedPortfolio.getCurrentTotalValue(),
+
+        Portfolio portfolio1 = new Portfolio(updatedPortfolio.getPortfolioId(),updatedPortfolio.getClientId(),updatedPortfolio.getName(),updatedPortfolio.getCurrentTotalValue(),
                 updatedPortfolio.getPurchaseValue(),updatedPortfolio.getSellValue());
+
+        return new PortfolioHolding(portfolio1, newHolding);
         /**
          *
          * I would like you to help me return the newHoldings
          */
     }
 
-    public Portfolio getPortfolioById(Long portfolioId){
+    public PortfolioHolding getPortfolioById(Long portfolioId){
         Optional<Portfolio> portfolioById = portfolioRepository.findByPortfolioId(portfolioId);
         if(portfolioById.isEmpty()){
             throw new IllegalStateException("Portfolio is not found");
@@ -206,8 +211,11 @@ public class PortfolioService {
         log.info("ORDER MAP {}", orderMap);
         log.info("HOLDING MAP {}", newHolding);
         log.info("Inside getPortfolioById method inside PortfolioService");
-        return new Portfolio(updatedPortfolio.getPortfolioId(),updatedPortfolio.getClientId(),updatedPortfolio.getName(),updatedPortfolio.getCurrentTotalValue(),
+
+        Portfolio portfolio1 = new Portfolio(updatedPortfolio.getPortfolioId(),updatedPortfolio.getClientId(),updatedPortfolio.getName(),updatedPortfolio.getCurrentTotalValue(),
                 updatedPortfolio.getPurchaseValue(),updatedPortfolio.getSellValue());
+
+        return new PortfolioHolding(portfolio1, newHolding);
         /**
          *
          * I would like you to help me return the newHoldings

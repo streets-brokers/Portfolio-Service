@@ -24,13 +24,13 @@ public class PortfolioController {
     }
 
     @GetMapping("clientId/{clientId}")
-    public Portfolio getPortfolioByClientId(@PathVariable("clientId") Long clientId){
+    public PortfolioHolding getPortfolioByClientId(@PathVariable("clientId") Long clientId){
         log.info("Inside getPortfolioByClientId method i PortfolioController");
         return portfolioService.getPortfolioByClientId(clientId);
     }
 
     @GetMapping("portfolioId/{portfolioId}")
-    public Portfolio getPortfolioById(@PathVariable("portfolioId") Long portfolioId){
+    public PortfolioHolding getPortfolioById(@PathVariable("portfolioId") Long portfolioId){
         log.info("Inside getPortfolioById method in PortfolioController");
         return portfolioService.getPortfolioById(portfolioId);
     }
